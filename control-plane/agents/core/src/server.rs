@@ -8,6 +8,7 @@ pub mod watcher;
 use crate::core::registry;
 use common::Service;
 use common_lib::types::v0::message_bus::ChannelVs;
+use http::Uri;
 
 use common_lib::{mbus_api::BusClient, opentelemetry::default_tracing_tags};
 use opentelemetry::{global, sdk::propagation::TraceContextPropagator, KeyValue};
@@ -75,6 +76,11 @@ pub(crate) struct CliArgs {
     /// Trace rest requests to the Jaeger endpoint agent
     #[structopt(long, short)]
     jaeger: Option<String>,
+    /// The GRPC Server URLs to connect to
+    /// (supports the http/https schema)
+    /// Default: 0.0.0.0:50051
+    #[structopt(long, short, default_value = "https://0.0.0.0:50051")]
+    pub(crate) grpc_addr: Uri,
 }
 impl CliArgs {
     fn args() -> Self {
@@ -160,9 +166,11 @@ async fn server(cli_args: CliArgs) {
         .connect_message_bus(cli_args.no_min_timeouts, BusClient::CoreAgent)
         .await
         .with_shared_state(registry.clone())
+        .with_shared_state(cli_args.grpc_addr.clone())
         .configure_async(node::configure)
         .await
-        .configure(pool::configure)
+        .configure_async(pool::configure)
+        .await
         .configure(nexus::configure)
         .configure(volume::configure)
         .configure(watcher::configure);

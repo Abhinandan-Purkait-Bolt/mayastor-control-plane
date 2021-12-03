@@ -373,7 +373,15 @@ impl From<i32> for ReplicaShareProtocol {
     fn from(src: i32) -> Self {
         match src {
             1 => Self::Nvmf,
+            0 => Self::Nvmf,
             _ => panic!("Invalid replica share protocol {}", src),
+        }
+    }
+}
+impl From<ReplicaShareProtocol> for i32 {
+    fn from(src: ReplicaShareProtocol) -> Self {
+        match src {
+            ReplicaShareProtocol::Nvmf => 0,
         }
     }
 }
@@ -382,6 +390,17 @@ impl From<ReplicaShareProtocol> for Protocol {
         match src {
             ReplicaShareProtocol::Nvmf => Self::Nvmf,
         }
+    }
+}
+
+impl TryFrom<&str> for ReplicaShareProtocol {
+    type Error = String;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Ok(match value {
+            "nvmf" => Self::Nvmf,
+            _ => panic!("Invalid replica share protocol {}", value),
+        })
     }
 }
 
@@ -418,6 +437,16 @@ impl From<i32> for ReplicaStatus {
             2 => Self::Degraded,
             3 => Self::Faulted,
             _ => Self::Unknown,
+        }
+    }
+}
+impl From<ReplicaStatus> for i32 {
+    fn from(src: ReplicaStatus) -> Self {
+        match src {
+            ReplicaStatus::Online => 1,
+            ReplicaStatus::Degraded => 2,
+            ReplicaStatus::Faulted => 3,
+            _ => 0,
         }
     }
 }

@@ -12,22 +12,34 @@ use opentelemetry::{
     KeyValue,
 };
 
-use common_lib::{
-    mbus_api,
-    mbus_api::{Message, TimeoutOptions},
-    types::v0::message_bus,
-};
+use common_lib::{mbus_api, mbus_api::TimeoutOptions, types::v0::message_bus};
 use openapi::apis::Uuid;
 
-use common_lib::types::v0::store::{
-    definitions::ObjectKey,
-    registry::{ControlPlaneService, StoreLeaseLockKey},
+use common_lib::{
+    mbus_api::ReplyError,
+    types::v0::{
+        message_bus::CreatePool,
+        store::{
+            definitions::ObjectKey,
+            registry::{ControlPlaneService, StoreLeaseLockKey},
+        },
+    },
 };
 pub use etcd_client;
 use etcd_client::DeleteOptions;
+use grpc::{
+    pool::{client::PoolClient, traits::PoolOperations},
+    replica::{client::ReplicaClient, traits::ReplicaOperations},
+};
 use rpc::mayastor::RpcHandle;
-use std::{collections::HashMap, convert::TryInto, net::SocketAddr, time::Duration};
+use std::{
+    collections::HashMap,
+    convert::{TryFrom, TryInto},
+    net::SocketAddr,
+    time::Duration,
+};
 use structopt::StructOpt;
+use tonic::transport::Uri;
 
 #[tokio::test]
 #[ignore]
@@ -105,7 +117,14 @@ impl Cluster {
     pub fn node(&self, index: u32) -> message_bus::NodeId {
         Mayastor::name(index, &self.builder.opts).into()
     }
-
+    /// grpc addr for tests
+    pub fn grpc_endpoint(&self, container_name: &str) -> Uri {
+        Uri::try_from(format!(
+            "https://{}:50051",
+            self.composer.container_ip(container_name)
+        ))
+        .unwrap()
+    }
     /// node ip for `index`
     pub fn node_ip(&self, index: u32) -> String {
         let name = self.node(index);
@@ -259,6 +278,34 @@ where
             error
         )),
         Ok(_) => Err(anyhow::anyhow!("Expected '{:#?}' but succeeded!", expected)),
+    }
+}
+
+///
+pub async fn test_result_grpc<F, O, E, T>(
+    expected: &Result<O, E>,
+    future: F,
+) -> Result<(), ReplyError>
+where
+    F: std::future::Future<Output = Result<T, ReplyError>>,
+    E: std::fmt::Debug,
+    O: std::fmt::Debug,
+    T: std::fmt::Debug,
+{
+    match future.await {
+        Ok(_) if expected.is_ok() => Ok(()),
+        Err(error) if expected.is_err() => {
+            let ReplyError { .. } = error;
+            Ok(())
+        }
+        Err(error) => Err(ReplyError::invalid_reply_error(format!(
+            "Expected '{:#?}' but failed with '{:?}'!",
+            expected, error
+        ))),
+        Ok(r) => Err(ReplyError::invalid_reply_error(format!(
+            "Expected '{:#?} {:#?}' but succeeded!",
+            expected, r
+        ))),
     }
 }
 
@@ -624,18 +671,25 @@ impl ClusterBuilder {
         }
 
         for pool in &self.pools() {
-            message_bus::CreatePool {
-                node: pool.node.clone().into(),
-                id: pool.id(),
-                disks: vec![pool.disk()],
-                labels: None,
-            }
-            .request()
-            .await
-            .unwrap();
+            let grpc_addr =
+                Uri::try_from(grpc_addr(cluster.composer.container_ip("core"))).unwrap();
+            let pool_client = PoolClient::init(Some(grpc_addr.clone()), None).await;
+            let replica_client = ReplicaClient::init(Some(grpc_addr.clone()), None).await;
+            pool_client
+                .create(
+                    &CreatePool {
+                        node: pool.node.clone().into(),
+                        id: pool.id(),
+                        disks: vec![pool.disk()],
+                        labels: None,
+                    },
+                    None,
+                )
+                .await
+                .unwrap();
 
             for replica in &pool.replicas {
-                replica.request().await.unwrap();
+                replica_client.create(replica, None).await.unwrap();
             }
         }
 
@@ -700,4 +754,8 @@ impl Pool {
             PoolDisk::Tmp(disk) => disk.uri().into(),
         }
     }
+}
+
+fn grpc_addr(ip: String) -> String {
+    format!("https://{}:50051", ip)
 }

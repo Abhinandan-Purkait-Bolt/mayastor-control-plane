@@ -1,7 +1,8 @@
 #![feature(allow_fail)]
 
 use common_lib::{mbus_api::Message, types::v0::message_bus as v0};
-use testlib::{result_either, test_result, ClusterBuilder};
+use grpc::replica::{client::ReplicaClient, traits::ReplicaOperations};
+use testlib::{result_either, test_result_grpc, ClusterBuilder};
 
 // FIXME: CAS-721
 #[tokio::test]
@@ -43,6 +44,8 @@ async fn create_replica_protocols() {
         .await
         .unwrap();
 
+    let rep_client = ReplicaClient::init(Some(cluster.grpc_endpoint("core")), None).await;
+
     let protocols = vec![
         Err(v0::Protocol::Nbd),
         Err(v0::Protocol::Iscsi),
@@ -52,18 +55,20 @@ async fn create_replica_protocols() {
 
     for test in protocols {
         let protocol = result_either!(&test);
-        test_result(
+        test_result_grpc(
             &test,
-            v0::CreateReplica {
-                node: cluster.node(0),
-                uuid: v0::ReplicaId::new(),
-                pool: cluster.pool(0, 0),
-                size: 5 * 1024 * 1024,
-                thin: true,
-                share: *protocol,
-                ..Default::default()
-            }
-            .request(),
+            rep_client.create(
+                &v0::CreateReplica {
+                    node: cluster.node(0),
+                    uuid: v0::ReplicaId::new(),
+                    pool: cluster.pool(0, 0),
+                    size: 5 * 1024 * 1024,
+                    thin: true,
+                    share: *protocol,
+                    ..Default::default()
+                },
+                None,
+            ),
         )
         .await
         .unwrap();
@@ -79,7 +84,7 @@ async fn create_replica_sizes() {
         .build()
         .await
         .unwrap();
-
+    let rep_client = ReplicaClient::init(Some(cluster.grpc_endpoint("core")), None).await;
     let pool = cluster
         .rest_v00()
         .pools_api()
@@ -91,20 +96,23 @@ async fn create_replica_sizes() {
     let sizes = vec![Ok(capacity / 2), Ok(capacity), Err(capacity + 512)];
     for test in sizes {
         let size = result_either!(test);
-        test_result(&test, async {
-            let result = v0::CreateReplica {
-                node: cluster.node(0),
-                uuid: v0::ReplicaId::new(),
-                pool: cluster.pool(0, 0),
-                size,
-                thin: false,
-                ..Default::default()
-            }
-            .request()
-            .await;
+        test_result_grpc(&test, async {
+            let result = rep_client
+                .create(
+                    &v0::CreateReplica {
+                        node: cluster.node(0),
+                        uuid: v0::ReplicaId::new(),
+                        pool: cluster.pool(0, 0),
+                        size,
+                        thin: false,
+                        ..Default::default()
+                    },
+                    None,
+                )
+                .await;
             if let Ok(replica) = &result {
-                v0::DestroyReplica::from(replica.clone())
-                    .request()
+                rep_client
+                    .destroy(&v0::DestroyReplica::from(replica.clone()), None)
                     .await
                     .unwrap();
             }
@@ -125,51 +133,59 @@ async fn create_replica_idempotent_different_sizes() {
         .compose_build(|c| c.with_logs(false))
         .await
         .unwrap();
-
+    let rep_client = ReplicaClient::init(Some(cluster.grpc_endpoint("core")), None).await;
     let uuid = v0::ReplicaId::new();
     let size = 5 * 1024 * 1024;
-    let replica = v0::CreateReplica {
-        node: cluster.node(0),
-        uuid: uuid.clone(),
-        pool: cluster.pool(0, 0),
-        size,
-        thin: false,
-        share: v0::Protocol::None,
-        ..Default::default()
-    }
-    .request()
-    .await
-    .unwrap();
+    let replica = rep_client
+        .create(
+            &v0::CreateReplica {
+                node: cluster.node(0),
+                uuid: uuid.clone(),
+                pool: cluster.pool(0, 0),
+                size,
+                thin: false,
+                share: v0::Protocol::None,
+                ..Default::default()
+            },
+            None,
+        )
+        .await
+        .unwrap();
     assert_eq!(&replica.uuid, &uuid);
 
-    v0::CreateReplica {
-        node: cluster.node(0),
-        uuid: uuid.clone(),
-        pool: cluster.pool(0, 0),
-        size,
-        thin: replica.thin,
-        share: v0::Protocol::None,
-        ..Default::default()
-    }
-    .request()
-    .await
-    .unwrap();
-
-    let sizes = vec![Ok(size), Err(size / 2), Err(size * 2)];
-    for test in sizes {
-        let size = result_either!(test);
-        test_result(
-            &test,
-            v0::CreateReplica {
+    rep_client
+        .create(
+            &v0::CreateReplica {
                 node: cluster.node(0),
-                uuid: replica.uuid.clone(),
+                uuid: uuid.clone(),
                 pool: cluster.pool(0, 0),
                 size,
                 thin: replica.thin,
                 share: v0::Protocol::None,
                 ..Default::default()
-            }
-            .request(),
+            },
+            None,
+        )
+        .await
+        .unwrap();
+
+    let sizes = vec![Ok(size), Err(size / 2), Err(size * 2)];
+    for test in sizes {
+        let size = result_either!(test);
+        test_result_grpc(
+            &test,
+            rep_client.create(
+                &v0::CreateReplica {
+                    node: cluster.node(0),
+                    uuid: replica.uuid.clone(),
+                    pool: cluster.pool(0, 0),
+                    size,
+                    thin: replica.thin,
+                    share: v0::Protocol::None,
+                    ..Default::default()
+                },
+                None,
+            ),
         )
         .await
         .unwrap();
@@ -186,21 +202,24 @@ async fn create_replica_idempotent_different_protocols() {
         .compose_build(|c| c.with_logs(false))
         .await
         .unwrap();
-
+    let rep_client = ReplicaClient::init(Some(cluster.grpc_endpoint("core")), None).await;
     let uuid = v0::ReplicaId::new();
     let size = 5 * 1024 * 1024;
-    let replica = v0::CreateReplica {
-        node: cluster.node(0),
-        uuid: uuid.clone(),
-        pool: cluster.pool(0, 0),
-        size,
-        thin: false,
-        share: v0::Protocol::None,
-        ..Default::default()
-    }
-    .request()
-    .await
-    .unwrap();
+    let replica = rep_client
+        .create(
+            &v0::CreateReplica {
+                node: cluster.node(0),
+                uuid: uuid.clone(),
+                pool: cluster.pool(0, 0),
+                size,
+                thin: false,
+                share: v0::Protocol::None,
+                ..Default::default()
+            },
+            None,
+        )
+        .await
+        .unwrap();
     assert_eq!(&replica.uuid, &uuid);
 
     let protocols = vec![
@@ -210,18 +229,20 @@ async fn create_replica_idempotent_different_protocols() {
     ];
     for test in protocols {
         let protocol = result_either!(&test);
-        test_result(
+        test_result_grpc(
             &test,
-            v0::CreateReplica {
-                node: cluster.node(0),
-                uuid: replica.uuid.clone(),
-                pool: replica.pool.clone(),
-                size: replica.size,
-                thin: replica.thin,
-                share: *protocol,
-                ..Default::default()
-            }
-            .request(),
+            rep_client.create(
+                &v0::CreateReplica {
+                    node: cluster.node(0),
+                    uuid: replica.uuid.clone(),
+                    pool: replica.pool.clone(),
+                    size: replica.size,
+                    thin: replica.thin,
+                    share: *protocol,
+                    ..Default::default()
+                },
+                None,
+            ),
         )
         .await
         .unwrap();

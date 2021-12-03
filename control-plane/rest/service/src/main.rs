@@ -1,17 +1,17 @@
 mod authentication;
 mod v0;
 
+use crate::v0::CORE_CLIENT;
 use actix_service::ServiceFactory;
 use actix_web::{
     body::MessageBody,
     dev::{ServiceRequest, ServiceResponse},
     middleware, App, HttpServer,
 };
-
 use rustls::{Certificate, PrivateKey, ServerConfig};
 use rustls_pemfile::{certs, rsa_private_keys};
 
-use std::{fs::File, io::BufReader};
+use std::{convert::TryFrom, fs::File, io::BufReader};
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -28,6 +28,11 @@ pub(crate) struct CliArgs {
     /// Default: nats://0.0.0.0:4222
     #[structopt(long, short, default_value = "nats://0.0.0.0:4222")]
     nats: String,
+
+    /// The CORE Server URL or address to connect to
+    /// Default: core:50051
+    #[structopt(long, short = "z", default_value = "https://core:50051")]
+    core_grpc: String,
 
     /// Path to the certificate file
     #[structopt(long, short, required_unless = "dummy-certificates")]
@@ -88,6 +93,8 @@ use common_lib::{
     mbus_api::{BusClient, RequestMinTimeout, TimeoutOptions},
     opentelemetry::default_tracing_tags,
 };
+use grpc::client::CoreClient;
+use http::Uri;
 use opentelemetry::{
     global,
     sdk::{propagation::TraceContextPropagator, trace::Tracer},
@@ -222,6 +229,12 @@ async fn main() -> anyhow::Result<()> {
         bus_timeout_opts(),
     )
     .await;
+
+    CORE_CLIENT
+        .set(CoreClient::init(Uri::try_from(CliArgs::args().core_grpc).unwrap(), None).await)
+        .ok()
+        .expect("Expect to be initialised only once");
+
     let server = HttpServer::new(app).bind_rustls(CliArgs::args().https, get_certificates()?)?;
     if let Some(http) = CliArgs::args().http {
         server.bind(http).map_err(anyhow::Error::from)?

@@ -292,10 +292,21 @@ impl Default for Protocol {
 impl From<i32> for Protocol {
     fn from(src: i32) -> Self {
         match src {
-            0 => Self::None,
             1 => Self::Nvmf,
             2 => Self::Iscsi,
+            3 => Self::Nbd,
             _ => Self::None,
+        }
+    }
+}
+
+impl From<Protocol> for i32 {
+    fn from(src: Protocol) -> Self {
+        match src {
+            Protocol::Nvmf => 1,
+            Protocol::Iscsi => 2,
+            Protocol::Nbd => 3,
+            _ => 0,
         }
     }
 }
@@ -323,6 +334,19 @@ impl TryFrom<&str> for Protocol {
                 }
             }
         })
+    }
+}
+
+impl TryFrom<String> for Protocol {
+    type Error = String;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match value.as_str() {
+            "nvmf" => Ok(Self::Nvmf),
+            "iscsi" => Ok(Self::Iscsi),
+            "nbd" => Ok(Self::Nbd),
+            _ => Ok(Self::None),
+        }
     }
 }
 

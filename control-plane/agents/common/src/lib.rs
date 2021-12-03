@@ -14,6 +14,7 @@ use std::{
 use async_trait::async_trait;
 use dyn_clonable::clonable;
 use futures::{future::join_all, Future};
+use http::Uri;
 use snafu::{OptionExt, ResultExt, Snafu};
 use state::Container;
 use tracing::{debug, error};
@@ -30,6 +31,7 @@ use common_lib::{
         Channel,
     },
 };
+use grpc::{pool::traits::PoolOperations, replica::traits::ReplicaOperations};
 use opentelemetry::trace::FutureExt;
 
 /// Agent level errors
@@ -295,6 +297,20 @@ impl Service {
     pub fn with_subscription(self, service_subscriber: impl ServiceSubscriber + 'static) -> Self {
         let channel = self.channel.clone();
         self.with_subscription_channel(channel, service_subscriber)
+    }
+
+    /// Configure self to have a core transport
+    pub async fn with_transport<
+        T: PoolOperations + Send + Sync + 'static,
+        P: ReplicaOperations + Send + Sync + 'static,
+    >(
+        self,
+        pool_service: Arc<T>,
+        replica_service: Arc<P>,
+        addr: Uri,
+    ) -> Self {
+        grpc::server::CoreServer::init(pool_service, replica_service, addr).await;
+        self
     }
 
     /// Add a new subscriber on the given `channel`
