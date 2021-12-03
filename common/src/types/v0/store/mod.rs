@@ -43,6 +43,17 @@ impl<T> From<SpecStatus<T>> for models::SpecStatus {
     }
 }
 
+impl<T> From<SpecStatus<T>> for i32 {
+    fn from(src: SpecStatus<T>) -> Self {
+        match src {
+            SpecStatus::Creating => 0,
+            SpecStatus::Created(_) => 1,
+            SpecStatus::Deleting => 2,
+            SpecStatus::Deleted => 3,
+        }
+    }
+}
+
 impl<T: std::cmp::PartialEq> SpecStatus<T> {
     pub fn creating(&self) -> bool {
         self == &Self::Creating

@@ -55,6 +55,17 @@ impl From<PoolStatus> for models::PoolStatus {
     }
 }
 
+impl From<PoolStatus> for i32 {
+    fn from(pool_status: PoolStatus) -> Self {
+        match pool_status {
+            PoolStatus::Unknown => 0,
+            PoolStatus::Online => 1,
+            PoolStatus::Degraded => 2,
+            PoolStatus::Faulted => 3,
+        }
+    }
+}
+
 /// Pool information
 #[derive(Serialize, Deserialize, Default, Debug, Clone, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -159,6 +170,7 @@ impl Pool {
             state: Some(state),
         }
     }
+
     /// Try to construct a new pool from spec and state
     pub fn try_new(spec: Option<PoolSpec>, state: Option<PoolState>) -> Option<Self> {
         match (spec, state) {

@@ -1,20 +1,169 @@
 use crate::core::{registry::Registry, specs::ResourceSpecsLocked, wrapper::GetterOps};
 use common::errors::{PoolNotFound, ReplicaNotFound, SvcError};
 use common_lib::{
-    mbus_api::message_bus::v0::{Pools, Replicas},
+    mbus_api::{
+        message_bus::v0::{Pools, Replicas},
+        ReplyError,
+    },
     types::v0::{
         message_bus::{
             CreatePool, CreateReplica, DestroyPool, DestroyReplica, Filter, GetPools, GetReplicas,
-            NodeId, Pool, PoolId, Replica, ShareReplica, UnshareReplica,
+            NexusId, NodeId, Pool, PoolId, Protocol, Replica, ReplicaId, ReplicaOwners,
+            ReplicaShareProtocol, ShareReplica, UnshareReplica, VolumeId,
         },
         store::OperationMode,
     },
 };
+use grpc::{
+    grpc_opts::Context,
+    pool::traits::{CreatePoolInfo, DestroyPoolInfo, PoolOperations},
+    replica::traits::{
+        CreateReplicaInfo, DestroyReplicaInfo, ReplicaOperations, ShareReplicaInfo,
+        UnshareReplicaInfo,
+    },
+};
 use snafu::OptionExt;
+use std::{convert::TryFrom, str::FromStr};
 
 #[derive(Debug, Clone)]
 pub(super) struct Service {
     registry: Registry,
+}
+
+#[tonic::async_trait]
+impl PoolOperations for Service {
+    async fn create(
+        &self,
+        pool: &(dyn CreatePoolInfo + Sync + Send),
+        _ctx: Option<Context>,
+    ) -> Result<Pool, ReplyError> {
+        let req = CreatePool {
+            node: pool.node_id().into(),
+            id: pool.pool_id().into(),
+            disks: match pool.disks() {
+                None => vec![],
+                Some(disks) => disks.iter().map(|i| i.into()).collect(),
+            },
+            labels: pool.labels(),
+        };
+        let pool = self.create_pool(&req).await?;
+        Ok(pool)
+    }
+
+    async fn destroy(
+        &self,
+        pool: &(dyn DestroyPoolInfo + Sync + Send),
+        _ctx: Option<Context>,
+    ) -> Result<(), ReplyError> {
+        let req = DestroyPool {
+            node: pool.node_id().into(),
+            id: pool.pool_id().into(),
+        };
+        self.destroy_pool(&req).await?;
+        Ok(())
+    }
+
+    async fn get(&self, filter: Filter, _ctx: Option<Context>) -> Result<Pools, ReplyError> {
+        let req = GetPools { filter };
+        let pools = self.get_pools(&req).await?;
+        Ok(pools)
+    }
+}
+
+#[tonic::async_trait]
+impl ReplicaOperations for Service {
+    async fn create(
+        &self,
+        req: &(dyn CreateReplicaInfo + Sync + Send),
+        _ctx: Option<Context>,
+    ) -> Result<Replica, ReplyError> {
+        let create_replica = CreateReplica {
+            node: req.node().into(),
+            name: req.name().map(|name| name.into()),
+            uuid: ReplicaId::try_from(req.uuid()).unwrap(),
+            pool: req.pool().into(),
+            size: req.size(),
+            thin: req.thin(),
+            share: Protocol::from_str(req.share().as_str()).unwrap(),
+            managed: req.managed(),
+            owners: ReplicaOwners::new(
+                req.owners()
+                    .volume()
+                    .map(|id| VolumeId::try_from(id).unwrap()),
+                req.owners()
+                    .nexuses()
+                    .clone()
+                    .iter()
+                    .map(|f| NexusId::try_from(f).unwrap())
+                    .collect(),
+            ),
+        };
+        let replica = self.create_replica(&create_replica).await?;
+        Ok(replica)
+    }
+
+    async fn get(&self, filter: Filter, _ctx: Option<Context>) -> Result<Replicas, ReplyError> {
+        let req = GetReplicas { filter };
+        let replicas = self.get_replicas(&req).await?;
+        Ok(replicas)
+    }
+
+    async fn destroy(
+        &self,
+        req: &(dyn DestroyReplicaInfo + Sync + Send),
+        _ctx: Option<Context>,
+    ) -> Result<(), ReplyError> {
+        let destroy_replica = DestroyReplica {
+            node: req.node().into(),
+            pool: req.pool().into(),
+            uuid: ReplicaId::try_from(req.uuid()).unwrap(),
+            name: req.name().map(|name| name.into()),
+            disowners: ReplicaOwners::new(
+                req.disowners()
+                    .volume()
+                    .map(|id| VolumeId::try_from(id).unwrap()),
+                req.disowners()
+                    .nexuses()
+                    .clone()
+                    .iter()
+                    .map(|f| NexusId::try_from(f).unwrap())
+                    .collect(),
+            ),
+        };
+        self.destroy_replica(&destroy_replica).await?;
+        Ok(())
+    }
+
+    async fn share(
+        &self,
+        req: &(dyn ShareReplicaInfo + Sync + Send),
+        _ctx: Option<Context>,
+    ) -> Result<String, ReplyError> {
+        let share_replica = ShareReplica {
+            node: req.node().into(),
+            pool: req.pool().into(),
+            uuid: ReplicaId::try_from(req.uuid()).unwrap(),
+            name: req.name().map(|name| name.into()),
+            protocol: ReplicaShareProtocol::try_from(req.protocol().as_str()).unwrap(),
+        };
+        let response = self.share_replica(&share_replica).await?;
+        Ok(response)
+    }
+
+    async fn unshare(
+        &self,
+        req: &(dyn UnshareReplicaInfo + Sync + Send),
+        _ctx: Option<Context>,
+    ) -> Result<(), ReplyError> {
+        let unshare_replica = UnshareReplica {
+            node: req.node().into(),
+            pool: req.pool().into(),
+            uuid: ReplicaId::try_from(req.uuid()).unwrap(),
+            name: req.name().map(|name| name.into()),
+        };
+        self.unshare_replica(&unshare_replica).await?;
+        Ok(())
+    }
 }
 
 impl Service {
