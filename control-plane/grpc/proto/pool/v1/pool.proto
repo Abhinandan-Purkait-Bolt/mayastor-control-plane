@@ -1,10 +1,10 @@
 syntax = "proto3";
 
-import "common.proto";
+import "misc/common.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/wrappers.proto";
 
-package grpc;
+package pool;
 
 // A Mayastor Storage Pool
 // It may have a spec which is the specification provided by the creator
@@ -21,9 +21,10 @@ message Pools {
   repeated Pool pools = 1;
 }
 
-// PoolLabel is the type for the labels
-message PoolLabel {
-  map<string, string> labels = 1;
+// Error type for the control-plane specific errors
+message ReplyError {
+  uint32 status_code = 1;
+  string details = 2;
 }
 
 // Desired spec and the control plane related data
@@ -34,11 +35,12 @@ message PoolDefinition {
   Metadata metadata = 2;
 }
 
+// uuid and the status of pool for the control plane use
 message Metadata {
   // uuid of the pool
   google.protobuf.StringValue uuid = 2;
   // spec status of the pool
-  SpecStatus status = 4;
+  common.SpecStatus status = 4;
 }
 
 // User specification of a pool.
@@ -50,7 +52,7 @@ message PoolSpec {
   // absolute disk paths claimed by the pool
   repeated string disks = 3;
   // labels to be set on the pool
-  optional PoolLabel labels = 5;
+  optional common.StringMapValue labels = 5;
 }
 
 // Pool information
@@ -69,6 +71,7 @@ message PoolState {
   uint64 used = 6;
 }
 
+// status of the pool
 enum PoolStatus {
   // unknown state
   Unknown = 0;
@@ -96,7 +99,7 @@ message NodePoolFilter{
   string pool_id = 2;
 }
 
-// Get all the pools from based on the args
+// Get all pools based on the filter criteria
 message GetPoolsRequest {
   oneof filter {
     NodeFilter node = 1;
@@ -114,7 +117,7 @@ message CreatePoolRequest {
   // disk device paths or URIs to be claimed by the pool
   repeated string disks = 3;
   // labels to be set on the pool
-  optional PoolLabel labels = 5;
+  optional common.StringMapValue labels = 5;
 }
 
 // Destroy Pool Request
@@ -125,9 +128,30 @@ message DestroyPoolRequest {
   string pool_id = 2;
 }
 
+// Reply type for a CreatePool request
+message CreatePoolReply {
+  oneof reply {
+    Pool pool = 1;
+    ReplyError error = 2;
+  }
+}
+
+// Reply type for a DestroyPool request
+message DestroyPoolReply {
+  optional ReplyError error = 2;
+}
+
+// Reply type for a GetPools request
+message GetPoolsReply {
+  oneof reply {
+    Pools pools = 1;
+    ReplyError error = 2;
+  }
+}
+
 // Service for managing storage pools
-service CoreGrpc {
-  rpc CreatePool (CreatePoolRequest) returns (Pool) {}
-  rpc DestroyPool (DestroyPoolRequest) returns (google.protobuf.Empty) {}
-  rpc GetPools (GetPoolsRequest) returns (Pools) {}
+service PoolGrpc {
+  rpc CreatePool (CreatePoolRequest) returns (CreatePoolReply) {}
+  rpc DestroyPool (DestroyPoolRequest) returns (DestroyPoolReply) {}
+  rpc GetPools (GetPoolsRequest) returns (GetPoolsReply) {}
 }
