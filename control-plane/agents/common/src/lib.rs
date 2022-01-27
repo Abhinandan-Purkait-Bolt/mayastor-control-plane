@@ -33,6 +33,7 @@ use common_lib::{
 };
 use grpc::{pool::traits::PoolOperations, replica::traits::ReplicaOperations};
 use opentelemetry::trace::FutureExt;
+use tonic::transport::Server;
 
 /// Agent level errors
 pub mod errors;
@@ -64,6 +65,7 @@ pub enum ServiceError {
 /// message bus channel on a specific ID
 pub struct Service {
     server: String,
+    grpc_sever: Server,
     server_connected: bool,
     no_min_timeouts: bool,
     channel: Channel,
@@ -75,6 +77,7 @@ impl Default for Service {
     fn default() -> Self {
         Self {
             server: "".to_string(),
+            grpc_sever: Server::default(),
             server_connected: false,
             channel: Default::default(),
             subscriptions: Default::default(),
@@ -153,6 +156,7 @@ impl Service {
     pub fn builder(server: String, channel: impl Into<Channel>) -> Self {
         Self {
             server,
+            grpc_sever: Server::builder(),
             server_connected: false,
             channel: channel.into(),
             ..Default::default()
@@ -168,6 +172,18 @@ impl Service {
         client: impl Into<Option<BusClient>>,
     ) -> Self {
         self.message_bus_init(no_min_timeouts, client).await;
+        self
+    }
+
+    /// add each grpc service using this
+    pub fn add_grpc_service(&mut self, svc: Server) -> Self {
+        self.grpc_sever.add_service(svc);
+        self
+    }
+
+    /// start server using this
+    pub fn start_grpc_server(self) -> Self {
+        // TODO START SERVER
         self
     }
 

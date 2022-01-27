@@ -13,6 +13,7 @@ use http::Uri;
 use common_lib::{mbus_api::BusClient, opentelemetry::default_tracing_tags};
 use opentelemetry::{global, sdk::propagation::TraceContextPropagator, KeyValue};
 use structopt::StructOpt;
+use tonic::transport::Server;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Registry};
 use utils::package_info;
 
@@ -169,11 +170,12 @@ async fn server(cli_args: CliArgs) {
         .with_shared_state(cli_args.grpc_addr.clone())
         .configure_async(node::configure)
         .await
-        .configure_async(pool::configure)
-        .await
+        .configure(pool::configure)
         .configure(nexus::configure)
         .configure(volume::configure)
-        .configure(watcher::configure);
+        .configure(watcher::configure)
+        .start_grpc_server();
+
 
     registry.start().await;
     service.run().await;
