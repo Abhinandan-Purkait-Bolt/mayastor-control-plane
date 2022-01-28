@@ -1,3 +1,5 @@
+extern crate core;
+
 pub mod rest_client;
 
 use composer::{Builder, ComposeTest};
@@ -27,10 +29,7 @@ use common_lib::{
 };
 pub use etcd_client;
 use etcd_client::DeleteOptions;
-use grpc::{
-    pool::{client::PoolClient, traits::PoolOperations},
-    replica::{client::ReplicaClient, traits::ReplicaOperations},
-};
+use grpc::{client::CoreClient, pool::traits::PoolOperations, replica::traits::ReplicaOperations};
 use rpc::mayastor::RpcHandle;
 use std::{
     collections::HashMap,
@@ -69,6 +68,7 @@ pub fn default_options() -> StartOptions {
 pub struct Cluster {
     composer: ComposeTest,
     rest_client: rest_client::RestClient,
+    grpc_client: Option<CoreClient>,
     jaeger: Tracer,
     builder: ClusterBuilder,
 }
@@ -77,6 +77,11 @@ impl Cluster {
     /// compose utility
     pub fn composer(&self) -> &ComposeTest {
         &self.composer
+    }
+
+    /// grpc client for connection
+    pub fn grpc_client(&self) -> &CoreClient {
+        self.grpc_client.as_ref().unwrap()
     }
 
     /// return grpc handle to the container
@@ -214,9 +219,22 @@ impl Cluster {
             .install_simple()
             .unwrap();
 
+        let grpc_client = if components.core_enabled() {
+            Some(
+                CoreClient::init(
+                    Uri::try_from(grpc_addr(composer.container_ip("core"))).unwrap(),
+                    bus_timeout.clone(),
+                )
+                .await,
+            )
+        } else {
+            None
+        };
+
         let cluster = Cluster {
             composer,
             rest_client,
+            grpc_client,
             jaeger,
             builder: ClusterBuilder::builder(),
         };
@@ -671,10 +689,8 @@ impl ClusterBuilder {
         }
 
         for pool in &self.pools() {
-            let grpc_addr =
-                Uri::try_from(grpc_addr(cluster.composer.container_ip("core"))).unwrap();
-            let pool_client = PoolClient::init(Some(grpc_addr.clone()), None).await;
-            let replica_client = ReplicaClient::init(Some(grpc_addr.clone()), None).await;
+            let pool_client = cluster.grpc_client().pool_client();
+            let replica_client = cluster.grpc_client().replica_client();
             pool_client
                 .create(
                     &CreatePool {

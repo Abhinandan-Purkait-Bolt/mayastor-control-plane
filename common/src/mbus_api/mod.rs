@@ -19,9 +19,7 @@ use crate::types::{
 };
 use async_trait::async_trait;
 use dyn_clonable::clonable;
-pub use mbus_nats::{
-    bus, message_bus_init, message_bus_init_options, timeout_opts, NatsMessageBus,
-};
+pub use mbus_nats::{bus, message_bus_init, message_bus_init_options, NatsMessageBus};
 use opentelemetry::propagation::{Extractor, Injector};
 pub use receive::*;
 pub use send::*;

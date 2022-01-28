@@ -17,11 +17,7 @@ use common_lib::{
         store::replica::ReplicaSpec,
     },
 };
-use grpc::{
-    grpc_opts::Context,
-    pool::{client::PoolClient, traits::PoolOperations},
-    replica::{client::ReplicaClient, traits::ReplicaOperations},
-};
+use grpc::{grpc_opts::Context, pool::traits::PoolOperations, replica::traits::ReplicaOperations};
 use itertools::Itertools;
 use std::{convert::TryFrom, time::Duration};
 use testlib::{Cluster, ClusterBuilder};
@@ -39,8 +35,8 @@ async fn pool() {
     let nodes = GetNodes::default().request().await.unwrap();
     tracing::info!("Nodes: {:?}", nodes);
 
-    let pool_client = PoolClient::init(Some(cluster.grpc_endpoint("core")), None).await;
-    let rep_client = ReplicaClient::init(Some(cluster.grpc_endpoint("core")), None).await;
+    let pool_client = cluster.grpc_client().pool_client();
+    let rep_client = cluster.grpc_client().replica_client();
 
     let pool = pool_client
         .create(
@@ -214,10 +210,8 @@ async fn replica_transaction() {
         .unwrap();
     let mayastor = cluster.node(0);
 
-    let pool_client =
-        PoolClient::init(Some(cluster.grpc_endpoint("core")), bus_timeout_opts()).await;
-    let rep_client =
-        ReplicaClient::init(Some(cluster.grpc_endpoint("core")), bus_timeout_opts()).await;
+    let pool_client = cluster.grpc_client().pool_client();
+    let rep_client = cluster.grpc_client().replica_client();
 
     let nodes = GetNodes::default().request().await.unwrap();
     tracing::info!("Nodes: {:?}", nodes);
@@ -311,11 +305,7 @@ async fn replica_op_transaction_store(
     // pause mayastor
     cluster.composer().pause(mayastor.as_str()).await.unwrap();
 
-    let rep_client = ReplicaClient::init(
-        Some(cluster.grpc_endpoint("core")),
-        Some(bus_timeout_opts()),
-    )
-    .await;
+    let rep_client = cluster.grpc_client().replica_client();
 
     if share.clone().is_some() {
         rep_client
@@ -388,11 +378,7 @@ async fn replica_transaction_store() {
         .build()
         .await
         .unwrap();
-    let rep_client = ReplicaClient::init(
-        Some(cluster.grpc_endpoint("core")),
-        Some(bus_timeout_opts()),
-    )
-    .await;
+    let rep_client = cluster.grpc_client().replica_client();
     let mayastor = cluster.node(0);
 
     let replica = rep_client

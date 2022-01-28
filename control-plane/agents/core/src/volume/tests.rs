@@ -33,8 +33,8 @@ use common_lib::{
         store::{definitions::StorableObject, volume::VolumeSpec},
     },
 };
-use grpc::replica::{client::ReplicaClient, traits::ReplicaOperations};
-use http::Uri;
+use grpc::replica::traits::ReplicaOperations;
+
 use std::{
     convert::{TryFrom, TryInto},
     str::FromStr,
@@ -63,9 +63,9 @@ async fn volume() {
 
 #[tracing::instrument(skip(cluster))]
 async fn test_volume(cluster: &Cluster) {
-    smoke_test(cluster.grpc_endpoint("core")).await;
+    smoke_test(cluster).await;
     publishing_test(cluster).await;
-    replica_count_test(cluster.grpc_endpoint("core")).await;
+    replica_count_test(cluster).await;
     nexus_persistence_test(cluster).await;
 }
 
@@ -680,7 +680,7 @@ async fn hotspare_replica_count_spread(cluster: &Cluster) {
 
 /// Remove a replica that belongs to a volume. Another should be created.
 async fn hotspare_replica_count(cluster: &Cluster) {
-    let replica_client = ReplicaClient::init(Some(cluster.grpc_endpoint("core")), None).await;
+    let replica_client = cluster.grpc_client().replica_client();
     let volume = CreateVolume {
         uuid: "1e3cf927-80c2-47a8-adf0-95c486bdd7b7".try_into().unwrap(),
         size: 5242880,
@@ -877,8 +877,7 @@ async fn nexus_persistence_test(cluster: &Cluster) {
         (cluster.node(1), cluster.node(0)),
     ] {
         for test in vec![FaultTest::Local, FaultTest::Remote, FaultTest::Unclean] {
-            nexus_persistence_test_iteration(local, remote, test, cluster.grpc_endpoint("core"))
-                .await;
+            nexus_persistence_test_iteration(local, remote, test, cluster).await;
         }
     }
 }
@@ -886,9 +885,9 @@ async fn nexus_persistence_test_iteration(
     local: &NodeId,
     remote: &NodeId,
     fault: FaultTest,
-    grpc_addr: Uri,
+    cluster: &Cluster,
 ) {
-    let replica_client = ReplicaClient::init(Some(grpc_addr), None).await;
+    let replica_client = cluster.grpc_client().replica_client();
     tracing::debug!("arguments ({:?}, {:?}, {:?})", local, remote, fault);
     let allowed_nodes = vec![local.to_string(), remote.to_string()];
     let preferred_nodes: Vec<String> = vec![];
@@ -1037,7 +1036,7 @@ async fn nexus_persistence_test_iteration(
 
 #[tracing::instrument(skip(cluster))]
 async fn publishing_test(cluster: &Cluster) {
-    let replica_client = ReplicaClient::init(Some(cluster.grpc_endpoint("core")), None).await;
+    let replica_client = cluster.grpc_client().replica_client();
     let volume = CreateVolume {
         uuid: VolumeId::try_from("359b7e1a-b724-443b-98b4-e6d97fabbb40").unwrap(),
         size: 5242880,
@@ -1273,8 +1272,8 @@ async fn wait_for_volume_online(volume: &VolumeState) -> Result<VolumeState, ()>
     }
 }
 
-async fn replica_count_test(grpc_addr: Uri) {
-    let replica_client = ReplicaClient::init(Some(grpc_addr), None).await;
+async fn replica_count_test(cluster: &Cluster) {
+    let replica_client = cluster.grpc_client().replica_client();
     let volume = CreateVolume {
         uuid: VolumeId::try_from("359b7e1a-b724-443b-98b4-e6d97fabbb40").unwrap(),
         size: 5242880,
@@ -1433,8 +1432,8 @@ async fn replica_count_test(grpc_addr: Uri) {
         .is_empty());
 }
 
-async fn smoke_test(grpc_addr: Uri) {
-    let replica_client = ReplicaClient::init(Some(grpc_addr), None).await;
+async fn smoke_test(cluster: &Cluster) {
+    let replica_client = cluster.grpc_client().replica_client();
     let volume = CreateVolume {
         uuid: VolumeId::try_from("359b7e1a-b724-443b-98b4-e6d97fabbb40").unwrap(),
         size: 5242880,

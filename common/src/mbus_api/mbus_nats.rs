@@ -37,11 +37,6 @@ pub fn bus() -> DynBus {
     )
 }
 
-/// Get the global timeout_opts
-pub fn timeout_opts() -> TimeoutOptions {
-    bus().timeout_opts().clone()
-}
-
 // Would we want to have both sync and async clients?
 /// Nats implementation of the Bus
 #[derive(Clone)]

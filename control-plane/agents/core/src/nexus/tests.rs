@@ -11,7 +11,7 @@ use common_lib::{
         store::nexus::NexusSpec,
     },
 };
-use grpc::replica::{client::ReplicaClient, traits::ReplicaOperations};
+use grpc::replica::traits::ReplicaOperations;
 use std::{convert::TryFrom, time::Duration};
 use testlib::{Cluster, ClusterBuilder};
 
@@ -30,8 +30,7 @@ async fn nexus() {
     let nodes = GetNodes::default().request().await.unwrap();
     tracing::info!("Nodes: {:?}", nodes);
 
-    let rep_client =
-        ReplicaClient::init(Some(cluster.grpc_endpoint("core")), bus_timeout_opts()).await;
+    let rep_client = cluster.grpc_client().replica_client();
 
     let replica = rep_client
         .create(

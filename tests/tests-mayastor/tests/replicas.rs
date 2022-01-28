@@ -1,7 +1,8 @@
 #![feature(allow_fail)]
 
 use common_lib::types::v0::message_bus as v0;
-use grpc::replica::{client::ReplicaClient, traits::ReplicaOperations};
+use grpc::replica::traits::ReplicaOperations;
+
 use testlib::{result_either, test_result_grpc, ClusterBuilder};
 
 // FIXME: CAS-721
@@ -15,7 +16,7 @@ async fn create_replica() {
         .await
         .unwrap();
 
-    let rep_client = ReplicaClient::init(Some(cluster.grpc_endpoint("core")), None).await;
+    let rep_client = cluster.grpc_client().replica_client();
 
     let replica = v0::CreateReplica {
         node: cluster.node(0),
@@ -46,7 +47,7 @@ async fn create_replica_protocols() {
         .await
         .unwrap();
 
-    let rep_client = ReplicaClient::init(Some(cluster.grpc_endpoint("core")), None).await;
+    let rep_client = cluster.grpc_client().replica_client();
 
     let protocols = vec![
         Err(v0::Protocol::Nbd),
@@ -86,7 +87,7 @@ async fn create_replica_sizes() {
         .build()
         .await
         .unwrap();
-    let rep_client = ReplicaClient::init(Some(cluster.grpc_endpoint("core")), None).await;
+    let rep_client = cluster.grpc_client().replica_client();
     let pool = cluster
         .rest_v00()
         .pools_api()
@@ -135,7 +136,7 @@ async fn create_replica_idempotent_different_sizes() {
         .compose_build(|c| c.with_logs(false))
         .await
         .unwrap();
-    let rep_client = ReplicaClient::init(Some(cluster.grpc_endpoint("core")), None).await;
+    let rep_client = cluster.grpc_client().replica_client();
     let uuid = v0::ReplicaId::new();
     let size = 5 * 1024 * 1024;
     let replica = rep_client
@@ -204,7 +205,7 @@ async fn create_replica_idempotent_different_protocols() {
         .compose_build(|c| c.with_logs(false))
         .await
         .unwrap();
-    let rep_client = ReplicaClient::init(Some(cluster.grpc_endpoint("core")), None).await;
+    let rep_client = cluster.grpc_client().replica_client();
     let uuid = v0::ReplicaId::new();
     let size = 5 * 1024 * 1024;
     let replica = rep_client
