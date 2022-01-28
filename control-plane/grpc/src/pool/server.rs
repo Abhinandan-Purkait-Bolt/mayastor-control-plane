@@ -1,3 +1,4 @@
+pub use crate::pool_grpc::pool_grpc_server::PoolGrpcServer;
 use crate::{
     pool::traits::PoolOperations,
     pool_grpc,
@@ -20,6 +21,15 @@ pub struct PoolServer {
 impl PoolServer {
     pub fn new(service: Arc<dyn PoolOperations + Send + Sync>) -> Self {
         Self { service }
+    }
+    pub fn into_grpc_server(self) -> PoolGrpcServer<PoolServer> {
+        PoolGrpcServer::new(self)
+    }
+}
+
+impl Drop for PoolServer {
+    fn drop(&mut self) {
+        println!("DROPPING POOL SERVER")
     }
 }
 

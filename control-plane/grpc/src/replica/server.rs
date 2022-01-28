@@ -1,3 +1,4 @@
+pub use crate::replica_grpc::replica_grpc_server::ReplicaGrpcServer;
 use crate::{
     replica::traits::ReplicaOperations,
     replica_grpc::{
@@ -20,6 +21,15 @@ pub struct ReplicaServer {
 impl ReplicaServer {
     pub fn new(service: Arc<dyn ReplicaOperations + Send + Sync>) -> Self {
         Self { service }
+    }
+    pub fn into_grpc_server(self) -> ReplicaGrpcServer<ReplicaServer> {
+        ReplicaGrpcServer::new(self)
+    }
+}
+
+impl Drop for ReplicaServer {
+    fn drop(&mut self) {
+        println!("DROPPING REPLICA SERVER")
     }
 }
 
