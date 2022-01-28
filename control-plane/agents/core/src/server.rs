@@ -1,4 +1,5 @@
 pub mod core;
+pub mod lib;
 pub mod nexus;
 pub mod node;
 pub mod pool;
@@ -6,7 +7,6 @@ pub mod volume;
 pub mod watcher;
 
 use crate::core::registry;
-use common::Service;
 use common_lib::types::v0::message_bus::ChannelVs;
 use http::Uri;
 
@@ -157,7 +157,7 @@ async fn server(cli_args: CliArgs) {
     )
     .await;
 
-    let service = Service::builder(cli_args.nats.clone(), ChannelVs::Core)
+    let base_service = common::Service::builder(cli_args.nats.clone(), ChannelVs::Core)
         .with_shared_state(global::tracer_with_version(
             "core-agent",
             env!("CARGO_PKG_VERSION"),
@@ -175,6 +175,7 @@ async fn server(cli_args: CliArgs) {
         .configure(volume::configure)
         .configure(watcher::configure);
 
+    let service = lib::Service::new(base_service);
     registry.start().await;
     service.run().await;
     registry.stop().await;

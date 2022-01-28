@@ -15,6 +15,7 @@ use common_lib::{
 };
 use std::convert::TryFrom;
 
+/// all replica operations to be a part of the ReplicaOperations trait
 #[tonic::async_trait]
 pub trait ReplicaOperations {
     async fn create(

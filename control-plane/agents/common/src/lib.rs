@@ -13,7 +13,7 @@ use std::{
 
 use async_trait::async_trait;
 use dyn_clonable::clonable;
-use futures::{future::join_all, Future};
+use futures::Future;
 use http::Uri;
 use snafu::{OptionExt, ResultExt, Snafu};
 use state::Container;
@@ -33,6 +33,7 @@ use common_lib::{
 };
 use grpc::{pool::traits::PoolOperations, replica::traits::ReplicaOperations};
 use opentelemetry::trace::FutureExt;
+use tokio::task::JoinHandle;
 
 /// Agent level errors
 pub mod errors;
@@ -58,6 +59,8 @@ pub enum ServiceError {
         id: MessageId,
         details: String,
     },
+    #[snafu(display("GrpcServer error"))]
+    GrpcServer { source: tonic::transport::Error },
 }
 
 /// Runnable service with N subscriptions which listen on a given
@@ -465,7 +468,7 @@ impl Service {
     /// each channel benefits from a tokio thread which routes messages
     /// accordingly todo: only one subscriber per message id supported at
     /// the moment
-    pub async fn run(mut self) {
+    pub async fn run(mut self) -> Vec<JoinHandle<Result<(), ServiceError>>> {
         let mut threads = vec![];
 
         self.message_bus_init(self.no_min_timeouts, BusClient::CoreAgent)
@@ -485,15 +488,16 @@ impl Service {
             threads.push(handle);
         }
 
-        join_all(threads)
-            .await
-            .iter()
-            .for_each(|result| match result {
-                Err(error) => error!("Failed to wait for thread: {:?}", error),
-                Ok(Err(error)) => {
-                    error!("Error running channel thread: {:?}", error)
-                }
-                _ => {}
-            });
+        // join_all(threads)
+        //     .await
+        //     .iter()
+        //     .for_each(|result| match result {
+        //         Err(error) => error!("Failed to wait for thread: {:?}", error),
+        //         Ok(Err(error)) => {
+        //             error!("Error running channel thread: {:?}", error)
+        //         }
+        //         _ => {}
+        //     });
+        threads
     }
 }

@@ -1,7 +1,8 @@
 use crate::{
     replica::traits::ReplicaOperations,
     replica_grpc::{
-        create_replica_reply, get_replicas_reply, replica_grpc_server::ReplicaGrpc,
+        create_replica_reply, get_replicas_reply,
+        replica_grpc_server::{ReplicaGrpc, ReplicaGrpcServer},
         share_replica_reply, CreateReplicaReply, CreateReplicaRequest, DestroyReplicaReply,
         DestroyReplicaRequest, GetReplicasReply, GetReplicasRequest, ShareReplicaReply,
         ShareReplicaRequest, UnshareReplicaReply, UnshareReplicaRequest,
@@ -12,14 +13,25 @@ use std::sync::Arc;
 use tonic::Response;
 
 // RPC Replica Server
+#[derive(Clone)]
 pub struct ReplicaServer {
     // Service which executes the operations.
     service: Arc<dyn ReplicaOperations + Send + Sync>,
 }
 
+impl Drop for ReplicaServer {
+    fn drop(&mut self) {
+        println!("DROPPING REPLICA SERVER")
+    }
+}
+
 impl ReplicaServer {
+    // create a new instance of the replica server
     pub fn new(service: Arc<dyn ReplicaOperations + Send + Sync>) -> Self {
         Self { service }
+    }
+    pub fn into_grpc_server(self) -> ReplicaGrpcServer<ReplicaServer> {
+        ReplicaGrpcServer::new(self)
     }
 }
 

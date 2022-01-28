@@ -274,6 +274,7 @@ impl Components {
     pub fn nats_enabled(&self) -> bool {
         !self.1.no_nats
     }
+    /// to check whether core agent is being deployed or not
     pub fn core_enabled(&self) -> bool {
         self.0.contains(&Component::Core(Default::default()))
     }

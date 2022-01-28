@@ -2,8 +2,10 @@ use crate::{
     pool::traits::PoolOperations,
     pool_grpc,
     pool_grpc::{
-        create_pool_reply, get_pools_reply, pool_grpc_server::PoolGrpc, CreatePoolReply,
-        CreatePoolRequest, DestroyPoolReply, DestroyPoolRequest, GetPoolsReply, GetPoolsRequest,
+        create_pool_reply, get_pools_reply,
+        pool_grpc_server::{PoolGrpc, PoolGrpcServer},
+        CreatePoolReply, CreatePoolRequest, DestroyPoolReply, DestroyPoolRequest, GetPoolsReply,
+        GetPoolsRequest,
     },
 };
 use common_lib::mbus_api::ReplyError;
@@ -12,14 +14,24 @@ use tonic::{Request, Response};
 
 use common_lib::types::v0::message_bus::Filter;
 // RPC Pool Server
+#[derive(Clone)]
 pub struct PoolServer {
     // Service which executes the operations.
     service: Arc<dyn PoolOperations + Send + Sync>,
 }
 
+impl Drop for PoolServer {
+    fn drop(&mut self) {
+        println!("DROPPING REPLICA SERVER")
+    }
+}
+
 impl PoolServer {
     pub fn new(service: Arc<dyn PoolOperations + Send + Sync>) -> Self {
         Self { service }
+    }
+    pub fn into_grpc_server(self) -> PoolGrpcServer<PoolServer> {
+        PoolGrpcServer::new(self)
     }
 }
 

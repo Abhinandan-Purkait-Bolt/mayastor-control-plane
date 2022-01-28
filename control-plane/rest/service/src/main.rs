@@ -230,6 +230,7 @@ async fn main() -> anyhow::Result<()> {
     )
     .await;
 
+    // Initialise the core client to be used in rest
     CORE_CLIENT
         .set(CoreClient::init(Uri::try_from(CliArgs::args().core_grpc).unwrap(), None).await)
         .ok()

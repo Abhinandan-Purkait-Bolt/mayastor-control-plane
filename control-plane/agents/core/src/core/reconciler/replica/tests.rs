@@ -9,6 +9,7 @@ use common_lib::{
         },
     },
 };
+//use grpc::replica::traits::ReplicaOperations;
 use std::{thread::sleep, time::Duration};
 use testlib::ClusterBuilder;
 
@@ -42,7 +43,10 @@ async fn test_disown_missing_owners() {
         .await
         .expect("Failed to create replica.");
 
+    tracing::error!("HOLA");
     // Check the replica exists.
+    let _rep_client = cluster.grpc_client().replica_client();
+
     let num_replicas = cluster
         .rest_v00()
         .replicas_api()
@@ -72,7 +76,7 @@ async fn test_disown_missing_owners() {
     cluster.restart_core().await;
 
     // Allow time for the core agent to restart.
-    sleep(Duration::from_secs(2));
+    sleep(Duration::from_secs(4));
 
     // The replica should be removed because none of its parents exist.
     let num_replicas = cluster
@@ -82,5 +86,11 @@ async fn test_disown_missing_owners() {
         .await
         .expect("Failed to get replicas.")
         .len();
+    // let num_replicas = rep_client
+    //     .get(Filter::None, None)
+    //     .await
+    //     .expect("Failed to get replicas.")
+    //     .into_inner()
+    //     .len();
     assert_eq!(num_replicas, 0);
 }

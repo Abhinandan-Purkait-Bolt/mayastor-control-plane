@@ -60,6 +60,7 @@ impl ReplicaClient {
                     .clone()
                     .connect_timeout(timeout)
                     .timeout(timeout);
+                tracing::error!("{:?} HELLO", endpoint.uri());
                 ReplicaGrpcClient::connect(endpoint.clone()).await.unwrap()
             }
             Some(timeout_opts) => {
