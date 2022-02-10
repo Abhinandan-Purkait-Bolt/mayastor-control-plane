@@ -19,6 +19,7 @@ use tonic::transport::{Channel, Uri};
 pub struct PoolClient {
     inner: Client<PoolGrpcClient<Channel>>,
 }
+
 impl Deref for PoolClient {
     type Target = Client<PoolGrpcClient<Channel>>;
     fn deref(&self) -> &Self::Target {
