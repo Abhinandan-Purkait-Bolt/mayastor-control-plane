@@ -1,3 +1,4 @@
+//#![warn(missing_docs)]
 use crate::{
     common,
     grpc_opts::Context,
@@ -490,12 +491,19 @@ impl TryFrom<get_volumes_request::Filter> for Filter {
     }
 }
 
+/// trait to be implemented for CreateVolume operation
 pub trait CreateVolumeInfo: Send + Sync {
+    /// uuid of the volume
     fn uuid(&self) -> VolumeId;
+    /// size in bytes of the volume
     fn size(&self) -> u64;
+    /// no of replicas of the volume
     fn replicas(&self) -> u64;
+    /// volume policy of the volume, i.e self_heal
     fn policy(&self) -> VolumePolicy;
+    /// topology configuration of the volume
     fn topology(&self) -> Option<Topology>;
+    /// labels to be added to the volumes for topology based scheduling
     fn labels(&self) -> Option<VolumeLabels>;
 }
 
@@ -592,7 +600,9 @@ impl From<&dyn CreateVolumeInfo> for CreateVolumeRequest {
     }
 }
 
+/// trait to be implemented for DestroyVolume operation
 pub trait DestroyVolumeInfo: Send + Sync {
+    /// uuid of the volume to be destroyed
     fn uuid(&self) -> VolumeId;
 }
 
@@ -622,8 +632,11 @@ impl From<&dyn DestroyVolumeInfo> for DestroyVolumeRequest {
     }
 }
 
+/// trait to be implemented for ShareVolume operation
 pub trait ShareVolumeInfo: Send + Sync {
+    /// uuid of the volume to be shared
     fn uuid(&self) -> VolumeId;
+    /// protocol over which the volume be shared
     fn share(&self) -> VolumeShareProtocol;
 }
 
@@ -666,7 +679,9 @@ impl From<&dyn ShareVolumeInfo> for ShareVolumeRequest {
     }
 }
 
+/// trait to be implemented for UnshareVolume operation
 pub trait UnshareVolumeInfo: Send + Sync {
+    /// uuid of the volume to be unshared
     fn uuid(&self) -> VolumeId;
 }
 
@@ -696,8 +711,11 @@ impl From<&dyn UnshareVolumeInfo> for UnshareVolumeRequest {
     }
 }
 
+/// trait to be implemented for PublishVolume operation
 pub trait PublishVolumeInfo: Send + Sync {
+    /// uuid of the volume to be published
     fn uuid(&self) -> VolumeId;
+    /// target node where
     fn target_node(&self) -> Option<NodeId>;
     fn share(&self) -> Option<VolumeShareProtocol>;
 }
@@ -802,8 +820,11 @@ impl From<&dyn UnpublishVolumeInfo> for UnpublishVolumeRequest {
     }
 }
 
+/// trait to be implemented for SetVolumeReplica operation
 pub trait SetVolumeReplicaInfo: Send + Sync {
+    /// uuid of the concerned volume
     fn uuid(&self) -> VolumeId;
+    /// no of replicas we want to set for the volume
     fn replicas(&self) -> u8;
 }
 

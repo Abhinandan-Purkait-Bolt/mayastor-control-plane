@@ -1,3 +1,4 @@
+//#![warn(missing_docs)]
 use crate::{
     operations::volume::traits::VolumeOperations,
     volume::{

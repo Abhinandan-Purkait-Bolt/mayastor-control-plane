@@ -1,3 +1,4 @@
+//#![warn(missing_docs)]
 use crate::{
     common::VolumeFilter,
     grpc_opts::{Client, Context},
