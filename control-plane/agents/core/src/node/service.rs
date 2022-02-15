@@ -8,10 +8,14 @@ use common::{
     v0::msg_translation::RpcToMessageBus,
 };
 use common_lib::types::v0::message_bus::{
-    Filter, GetSpecs, Node, NodeId, NodeState, NodeStatus, Specs, States,
+    Deregister, Filter, GetSpecs, Node, NodeId, NodeState, NodeStatus, Register, Specs, States,
 };
 
 use crate::core::wrapper::InternalOps;
+use grpc::{
+    grpc_opts::Context,
+    operations::{node::traits::NodeOperations, registration::traits::RegistrationOperations},
+};
 use rpc::mayastor::ListBlockDevicesRequest;
 use snafu::ResultExt;
 use std::{collections::HashMap, sync::Arc};
@@ -48,6 +52,34 @@ impl NodeCommsTimeout {
     /// timeout for the request itself
     pub fn request(&self) -> std::time::Duration {
         self.request
+    }
+}
+
+#[tonic::async_trait]
+impl NodeOperations for Service {
+    async fn get(&self, filter: Filter, _ctx: Option<Context>) -> Result<Nodes, ReplyError> {
+        let req = GetNodes::new(filter);
+        let pools = self.get_nodes(&req).await?;
+        Ok(pools)
+    }
+}
+
+#[tonic::async_trait]
+impl RegistrationOperations for Service {
+    async fn register(&self, req: Register) -> Result<(), ReplyError> {
+        let service = self.clone();
+        tokio::spawn(async move { service.register(&req).await }).await?;
+        Ok(())
+    }
+
+    async fn deregister(&self, req: Deregister) -> Result<(), ReplyError> {
+        let service = self.clone();
+        tokio::spawn(async move { service.deregister(&req).await }).await?;
+        Ok(())
+    }
+
+    async fn probe(&self, _ctx: Option<Context>) -> Result<bool, ReplyError> {
+        return Ok(true);
     }
 }
 

@@ -10,16 +10,15 @@ impl ComponentAction for Mayastor {
             let mayastor_socket =
                 format!("{}:10124", cfg.next_ip_for_name(&Self::name(i, options))?);
             let name = Self::name(i, options);
-            let nats = format!("nats.{}:4222", options.cluster_label.name());
             let bin = utils::MAYASTOR_BINARY;
             let binary = options.mayastor_bin.clone().or_else(|| Self::binary(bin));
 
             let mut spec = if let Some(binary) = binary {
                 ContainerSpec::from_binary(&name, Binary::from_path(&binary))
+                    .with_bind_binary_dir(true)
             } else {
                 ContainerSpec::from_image(&name, &options.mayastor_image)
             }
-            .with_args(vec!["-n", &nats])
             .with_args(vec!["-N", &name])
             .with_args(vec!["-g", &mayastor_socket])
             .with_bind("/tmp", "/host/tmp");

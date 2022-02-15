@@ -4,30 +4,29 @@ mod specs;
 /// node watchdog to keep track of a node's liveness
 pub(crate) mod watchdog;
 
-use super::{
-    core::registry::Registry, handler, handler_publish, impl_publish_handler, impl_request_handler,
-    CliArgs,
-};
+use super::{core::registry::Registry, handler, impl_request_handler, CliArgs};
 use common::{errors::SvcError, Service};
 use common_lib::mbus_api::{v0::*, *};
 
 use async_trait::async_trait;
 use common_lib::types::v0::message_bus::{
-    ChannelVs, Deregister, GetBlockDevices, GetNodes, GetSpecs, GetStates, Register,
+    ChannelVs, GetBlockDevices, GetNodes, GetSpecs, GetStates, Register,
 };
-use std::{convert::TryInto, marker::PhantomData};
+use grpc::operations::{node::server::NodeServer, registration::server::RegistrationServer};
+use std::{convert::TryInto, marker::PhantomData, sync::Arc};
 
 pub(crate) async fn configure(builder: Service) -> Service {
     let node_service = create_node_service(&builder).await;
+    let node_grpc_service = NodeServer::new(Arc::new(node_service.clone()));
+    let registration_service = RegistrationServer::new(Arc::new(node_service.clone()));
     builder
         .with_shared_state(node_service)
+        .with_shared_state(node_grpc_service)
+        .with_shared_state(registration_service)
         .with_channel(ChannelVs::Registry)
-        .with_subscription(handler_publish!(Register))
-        .with_subscription(handler_publish!(Deregister))
         .with_subscription(handler!(GetSpecs))
         .with_subscription(handler!(GetStates))
         .with_channel(ChannelVs::Node)
-        .with_subscription(handler!(GetNodes))
         .with_subscription(handler!(GetBlockDevices))
         .with_default_liveness()
 }

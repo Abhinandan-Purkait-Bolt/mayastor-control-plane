@@ -541,6 +541,52 @@ impl CreateVolumeInfo for CreateVolume {
     }
 }
 
+// pub struct ValidatedCreateVolumeRequest {
+//     inner: CreateVolumeRequest,
+//     uuid: VolumeId,
+// }
+//
+// impl CreateVolumeInfo for ValidatedCreateVolumeRequest {
+//     fn uuid(&self) -> VolumeId {
+//         self.uuid.clone()
+//     }
+//
+//     fn size(&self) -> u64 {
+//         self.inner
+//     }
+//
+//     fn replicas(&self) -> u64 {
+//         todo!()
+//     }
+//
+//     fn policy(&self) -> VolumePolicy {
+//         todo!()
+//     }
+//
+//     fn topology(&self) -> Option<Topology> {
+//         todo!()
+//     }
+//
+//     fn labels(&self) -> Option<VolumeLabels> {
+//         todo!()
+//     }
+// }
+//
+// pub trait ValidateReq {
+//     type Validate;
+//     fn validated(self) -> Result<Self::Validated, ReplyError>;
+// }
+//
+// impl ValidateReq for CreateVolumeRequest {
+//     type Validate = ValidatedCreateVolumeRequest;
+//     fn validated(self) -> Result<Self::Validated, ReplyError> {
+//         Ok(ValidatedCreateVolumeRequest{
+//             uuid: self.uuid.try_into()?,
+//             inner: self
+//         })
+//     }
+// }
+
 impl CreateVolumeInfo for CreateVolumeRequest {
     fn uuid(&self) -> VolumeId {
         VolumeId::try_from(self.uuid.clone().unwrap()).unwrap()

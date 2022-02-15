@@ -1,4 +1,5 @@
 use crate::operations::{
+    node::{client::NodeClient, traits::NodeOperations},
     pool::{client::PoolClient, traits::PoolOperations},
     replica::{client::ReplicaClient, traits::ReplicaOperations},
     volume::{client::VolumeClient, traits::VolumeOperations},
@@ -11,6 +12,7 @@ pub struct CoreClient {
     pool: PoolClient,
     replica: ReplicaClient,
     volume: VolumeClient,
+    node: NodeClient,
 }
 
 /// implement the CoreClient
@@ -20,11 +22,13 @@ impl CoreClient {
         let timeout_opts = opts.into();
         let pool_client = PoolClient::new(addr.clone(), timeout_opts.clone()).await;
         let replica_client = ReplicaClient::new(addr.clone(), timeout_opts.clone()).await;
-        let volume_client = VolumeClient::new(addr, timeout_opts).await;
+        let volume_client = VolumeClient::new(addr.clone(), timeout_opts.clone()).await;
+        let node_client = NodeClient::new(addr, timeout_opts).await;
         Self {
             pool: pool_client,
             replica: replica_client,
             volume: volume_client,
+            node: node_client,
         }
     }
     /// retrieve the corresponding pool client
@@ -38,5 +42,9 @@ impl CoreClient {
     /// retrieve the corresponding volume client
     pub fn volume(&self) -> impl VolumeOperations {
         self.volume.clone()
+    }
+    /// retrieve the corresponding registration client
+    pub fn node(&self) -> impl NodeOperations {
+        self.node.clone()
     }
 }

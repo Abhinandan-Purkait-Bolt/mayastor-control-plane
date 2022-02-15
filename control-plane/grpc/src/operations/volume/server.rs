@@ -40,7 +40,7 @@ impl VolumeGrpc for VolumeServer {
         &self,
         request: tonic::Request<CreateVolumeRequest>,
     ) -> Result<tonic::Response<CreateVolumeReply>, tonic::Status> {
-        let req = request.into_inner();
+        let req = request.into_inner(); //.validated()?;
         match self.service.create(&req, None).await {
             Ok(volume) => Ok(Response::new(CreateVolumeReply {
                 reply: Some(create_volume_reply::Reply::Volume(volume.into())),
