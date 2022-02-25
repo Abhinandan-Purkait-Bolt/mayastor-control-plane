@@ -124,8 +124,8 @@ impl Default for NexusShareProtocol {
 impl From<i32> for NexusShareProtocol {
     fn from(src: i32) -> Self {
         match src {
-            0 | 1 => Self::Nvmf,
-            2 => Self::Iscsi,
+            0 => Self::Nvmf,
+            1 => Self::Iscsi,
             _ => panic!("Invalid nexus share protocol {}", src),
         }
     }
