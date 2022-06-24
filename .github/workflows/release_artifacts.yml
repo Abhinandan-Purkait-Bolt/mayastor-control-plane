@@ -6,6 +6,7 @@ on:
       - 'release-**'
       - 'release/**'
       - 'hotfix-v**'
+    workflow_dispatch:
 
 jobs:
   kubectl-plugin:
