@@ -1,12 +1,12 @@
 name: Release Artifacts
 on:
+  workflow_dispatch:
   push:
     branches:
       - master
       - 'release-**'
       - 'release/**'
       - 'hotfix-v**'
-    workflow_dispatch:
 
 jobs:
   kubectl-plugin:
